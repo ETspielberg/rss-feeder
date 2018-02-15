@@ -65,24 +65,17 @@ public class RssFeederController {
         Notationgroup notationgroup = responseNotationgroup.getBody();
 
         log.info("retrieved " + notationgroup.getNotationgroupName());
-        LocalDateTime startDate = LocalDateTime.now().minusDays(alertcontrol.getTimeperiod());
-        ZonedDateTime zonedStartDate = startDate.atZone(ZoneId.systemDefault());
-        Date date = Date.from(zonedStartDate.toInstant());
 
-
-        String url = dataUrl + "/nrequests/search/getFilteredNrequestsForNotationgroup"
+        String url = dataUrl + "/nrequests/getForTimeperiod"
                 + "?startNotation=" + notationgroup.getNotationsStart() + "&endNotation=" + notationgroup.getNotationsEnd()
                 + "&ratio=" + alertcontrol.getThresholdRatio()
                 + "&duration=" + alertcontrol.getThresholdDuration()
-                + "&requests=" + alertcontrol.getThresholdRequests()
-                + "&startDate=" + URLEncoder.encode(date.toString(),"UTF-8");
+                + "&thresholdNrequests=" + alertcontrol.getThresholdRequests()
+                + "&timeperiod=" + alertcontrol.getTimeperiod();
         log.info("querying " + url);
-        Traverson traverson = new  Traverson(new URI(url), MediaTypes.HAL_JSON);
-        Traverson.TraversalBuilder tb = traverson.follow("$._links.self.href");
-        ParameterizedTypeReference<Resources<Nrequests>> typeRefDevices = new ParameterizedTypeReference<Resources<Nrequests>>() {};
-        Resources<Nrequests> resourcesNrequests = tb.toObject(typeRefDevices);
-        Collection<Nrequests> nrequestss = resourcesNrequests.getContent();
-        log.info("found " + nrequestss.size() + " entries");
+
+        Nrequests[] nrequestss = new RestTemplate().getForEntity(url,Nrequests[].class).getBody();
+        log.info("found " + nrequestss.length + " entries");
 
         List entries = new ArrayList();
 
