@@ -74,7 +74,7 @@ public class RssFeederController {
 
         for (Nrequests nrequests : nrequestss) {
             ResponseEntity<Ignored> response = new RestTemplate().getForEntity(
-                    "http://localhost:8082/api/settings/stockcontrol/" + nrequests.getTitleId(),
+                    "http://localhost:8082/api/blacklist/" + nrequests.getTitleId(),
                     Ignored.class,
                     0);
             if (response.getStatusCode().value() == 200) {
