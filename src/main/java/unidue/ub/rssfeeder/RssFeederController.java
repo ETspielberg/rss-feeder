@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import unidue.ub.media.blacklist.Ignored;
 import unidue.ub.media.analysis.Nrequests;
@@ -73,45 +74,45 @@ public class RssFeederController {
         List<SyndEntry> entries = new ArrayList<SyndEntry>();
 
         for (Nrequests nrequests : nrequestss) {
-            ResponseEntity<Ignored> response = new RestTemplate().getForEntity(
-                    "http://localhost:8082/api/blacklist/ignored/" + nrequests.getTitleId(),
-                    Ignored.class,
-                    0);
-            if (response.getStatusCode().value() == 200) {
+            try {
+                ResponseEntity<Ignored> response = new RestTemplate().getForEntity(
+                        "http://localhost:8082/api/blacklist/ignored/" + nrequests.getTitleId(),
+                        Ignored.class,
+                        0);
                 Ignored ignored = response.getBody();
                 if (ignored.getExpire().after(new Date()) && ignored.getType().equals("eventanalysis")) {
                     log.info("manifestion blacklisted");
                     return null;
                 }
-            }
-            if (requestor.isPresent()) {
-                if (nrequests.status == null || nrequests.status.equals("")) {
-                    nrequests.status = requestor.get();
-                } else
-                    if (nrequests.status.contains(requestor.get()))
+            } catch (HttpClientErrorException httpClientErrorException) {
+                if (requestor.isPresent()) {
+                    if (nrequests.status == null || nrequests.status.equals("")) {
+                        nrequests.status = requestor.get();
+                    } else if (nrequests.status.contains(requestor.get()))
                         continue;
                     nrequests.status = nrequests.status + " " + requestor.get();
-            }
+                }
 
-            boolean isTotalDurationThresholdExceeded = nrequests.geTotalDuration() > alertcontrol.getThresholdDuration();
-            boolean isRatioThresholdExceeded = nrequests.getRatio() > alertcontrol.getThresholdRatio();
-            boolean isNRequestsThresholdExceeded = nrequests.getNRequests() > alertcontrol.getThresholdRequests();
-            if (isTotalDurationThresholdExceeded || isRatioThresholdExceeded || isNRequestsThresholdExceeded) {
-                SyndEntry entry = new SyndEntryImpl();
-                entry.setTitle(nrequests.getShelfmark());
-                entry.setUpdatedDate(new Date());
-                SyndContent content = new SyndContentImpl();
-                content.setValue("<h2>" + nrequests.getShelfmark()  + ":</h2>" +
-                        nrequests.getMab() + " <br /> " +
-                        "Verhältnis: " + nrequests.getRatio() + " <br /> Anzahl Vormerkungen: " + nrequests.getNRequests() +
-                        " <br /> Dauer: " + nrequests.geTotalDuration() +
-                        " <br /> <a href=\"/protokoll?shelfmark="+ nrequests.getShelfmark() + "&exact=\">Zum Ausleihprotokoll</a>");
-                entry.setContents(Collections.singletonList(content));
-                entries.add(entry);
+                boolean isTotalDurationThresholdExceeded = nrequests.geTotalDuration() > alertcontrol.getThresholdDuration();
+                boolean isRatioThresholdExceeded = nrequests.getRatio() > alertcontrol.getThresholdRatio();
+                boolean isNRequestsThresholdExceeded = nrequests.getNRequests() > alertcontrol.getThresholdRequests();
+                if (isTotalDurationThresholdExceeded || isRatioThresholdExceeded || isNRequestsThresholdExceeded) {
+                    SyndEntry entry = new SyndEntryImpl();
+                    entry.setTitle(nrequests.getShelfmark());
+                    entry.setUpdatedDate(new Date());
+                    SyndContent content = new SyndContentImpl();
+                    content.setValue("<h2>" + nrequests.getShelfmark() + ":</h2>" +
+                            nrequests.getMab() + " <br /> " +
+                            "Verhältnis: " + nrequests.getRatio() + " <br /> Anzahl Vormerkungen: " + nrequests.getNRequests() +
+                            " <br /> Dauer: " + nrequests.geTotalDuration() +
+                            " <br /> <a href=\"/protokoll?shelfmark=" + nrequests.getShelfmark() + "&exact=\">Zum Ausleihprotokoll</a>");
+                    entry.setContents(Collections.singletonList(content));
+                    entries.add(entry);
+                }
             }
+            feed.setEntries(entries);
+            updateNrequests(nrequestss);
         }
-        feed.setEntries(entries);
-        updateNrequests(nrequestss);
         return new SyndFeedOutput().outputString(feed);
     }
 
