@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
-import unidue.ub.media.analysis.Ignored;
+import unidue.ub.media.blacklist.Ignored;
 import unidue.ub.media.analysis.Nrequests;
 import unidue.ub.settings.fachref.Alertcontrol;
 import unidue.ub.settings.fachref.Notationgroup;
