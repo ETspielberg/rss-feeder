@@ -47,6 +47,8 @@ public class RssFeederController {
     @ResponseBody
     @RequestMapping("/")
     public String getNrequestsFeed(@RequestParam("alertcontrol") String identifier, @RequestParam("requestor") Optional<String> requestor) throws FeedException, URISyntaxException, UnsupportedEncodingException {
+        foundNrequests = new Hashtable<>();
+
         SyndFeed feed = new SyndFeedImpl();
         feed.setFeedType("atom_1.0");
         feed.setTitle("Hitlisten-Feed");
