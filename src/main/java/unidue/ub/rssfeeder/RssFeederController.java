@@ -38,6 +38,8 @@ public class RssFeederController {
     //@Value("${ub.statistics.data.url}")
     private String dataUrl = "http://localhost:11200";
 
+    private Hashtable<String, Nrequests> foundNrequests;
+
     private Logger log = LoggerFactory.getLogger(this.getClass());
     private ObjectMapper mapper = new ObjectMapper();
     private static final HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
@@ -64,14 +66,9 @@ public class RssFeederController {
 
         String url = dataUrl + "/nrequests/getForTimeperiod"
                 + "?startNotation=" + notationgroup.getNotationsStart() + "&endNotation=" + notationgroup.getNotationsEnd()
-                + "&ratio=" + alertcontrol.getThresholdRatio()
-                + "&duration=" + alertcontrol.getThresholdDuration()
-                + "&thresholdNrequests=" + alertcontrol.getThresholdRequests()
                 + "&timeperiod=" + alertcontrol.getTimeperiod();
 
         Nrequests[] nrequestss = new RestTemplate().getForEntity(url, Nrequests[].class).getBody();
-
-        List<SyndEntry> entries = new ArrayList<SyndEntry>();
 
         for (Nrequests nrequests : nrequestss) {
             try {
@@ -81,15 +78,16 @@ public class RssFeederController {
                         0);
                 Ignored ignored = response.getBody();
                 if (ignored.getExpire().after(new Date()) && ignored.getType().equals("eventanalysis")) {
-                    log.info("manifestion blacklisted");
-                    return null;
+                    log.info("manifestion " + nrequests.getTitleId() + " is blacklisted");
+                    continue;
                 }
             } catch (HttpClientErrorException httpClientErrorException) {
                 if (requestor.isPresent()) {
-                    if (nrequests.status == null || nrequests.status.equals("")) {
+                    if (nrequests.status == null || nrequests.status.equals("") || nrequests.status.equals("NEW")) {
                         nrequests.status = requestor.get();
                     } else if (nrequests.status.contains(requestor.get()))
                         continue;
+                } else {
                     nrequests.status = nrequests.status + " " + requestor.get();
                 }
 
@@ -97,23 +95,36 @@ public class RssFeederController {
                 boolean isRatioThresholdExceeded = nrequests.getRatio() > alertcontrol.getThresholdRatio();
                 boolean isNRequestsThresholdExceeded = nrequests.getNRequests() > alertcontrol.getThresholdRequests();
                 if (isTotalDurationThresholdExceeded || isRatioThresholdExceeded || isNRequestsThresholdExceeded) {
-                    SyndEntry entry = new SyndEntryImpl();
-                    entry.setTitle(nrequests.getShelfmark());
-                    entry.setUpdatedDate(new Date());
-                    SyndContent content = new SyndContentImpl();
-                    content.setValue("<h2>" + nrequests.getShelfmark() + ":</h2>" +
-                            nrequests.getMab() + " <br /> " +
-                            "Verhältnis: " + nrequests.getRatio() + " <br /> Anzahl Vormerkungen: " + nrequests.getNRequests() +
-                            " <br /> Dauer: " + nrequests.geTotalDuration() +
-                            " <br /> <a href=\"/protokoll?shelfmark=" + nrequests.getShelfmark() + "&exact=\">Zum Ausleihprotokoll</a>");
-                    entry.setContents(Collections.singletonList(content));
-                    entries.add(entry);
+                    if (foundNrequests.containsKey(nrequests.getTitleId())) {
+                        if (foundNrequests.get(nrequests.getTitleId()).getNRequests() < nrequests.getNRequests())
+                            foundNrequests.replace(nrequests.getTitleId(), nrequests);
+                    } else {
+                        foundNrequests.put(nrequests.getTitleId(),nrequests);
+                    }
                 }
             }
-            feed.setEntries(entries);
-            updateNrequests(nrequestss);
         }
+        feed.setEntries(getFeedListFromNrequests());
+        updateNrequests(nrequestss);
         return new SyndFeedOutput().outputString(feed);
+    }
+
+    private List<SyndEntry> getFeedListFromNrequests() {
+        List<SyndEntry> entries = new ArrayList<>();
+        for (Nrequests nrequests : foundNrequests.values()) {
+            SyndEntry entry = new SyndEntryImpl();
+            entry.setTitle(nrequests.getShelfmark());
+            entry.setUpdatedDate(new Date());
+            SyndContent content = new SyndContentImpl();
+            content.setValue("<h2>" + nrequests.getShelfmark() + ":</h2>" +
+                    nrequests.getMab() + " <br /> " +
+                    "<table><tr><td>Verhältnis:</td><td>" + String.format("%.2f", nrequests.getRatio()) + "</td></tr><tr><td>Anzahl Vormerkungen: </td><td>" + nrequests.getNRequests() +
+                    " </td></tr><tr><td>Dauer: </td><td>" + nrequests.geTotalDuration() +
+                    " </td></tr><table><br /><a href=\"/protokoll?shelfmark=" + nrequests.getShelfmark() + "&exact=\">Zum Ausleihprotokoll</a>");
+            entry.setContents(Collections.singletonList(content));
+            entries.add(entry);
+        }
+        return entries;
     }
 
     private void updateNrequests(Nrequests[] nrequestss) {
@@ -133,7 +144,7 @@ public class RssFeederController {
                 log.warn("could not update nrequests for " + nrequest.getTitleId());
             }
         }
-        log.info("successfully posted " + succesfullPosts + " of " + nrequestss.length + " counter data.");
+        log.info("successfully posted " + succesfullPosts + " of " + nrequestss.length + " nrequests.");
     }
 
 }
