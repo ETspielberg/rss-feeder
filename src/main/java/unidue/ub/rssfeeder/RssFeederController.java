@@ -85,12 +85,17 @@ public class RssFeederController {
                 }
             } catch (HttpClientErrorException httpClientErrorException) {
                 if (requestor.isPresent()) {
+                    log.info("checking for requestor " + requestor.get());
                     if (nrequests.status == null || nrequests.status.equals("") || nrequests.status.equals("NEW")) {
-                        nrequests.status = requestor.get();
-                    } else if (nrequests.status.contains(requestor.get()))
+                        nrequests.setStatus(requestor.get());
+                        log.info("set status to requestor");
+                    } else if (nrequests.status.contains(requestor.get())) {
+                        log.info("nrequests already collected by requestor");
                         continue;
-                } else {
-                    nrequests.status = nrequests.status + " " + requestor.get();
+                    } else {
+                        nrequests.status = nrequests.status + " " + requestor.get();
+                        log.info("adding requestor " + requestor.get() + " to list of requestors: " + nrequests.status);
+                    }
                 }
 
                 boolean isTotalDurationThresholdExceeded = nrequests.geTotalDuration() > alertcontrol.getThresholdDuration();
