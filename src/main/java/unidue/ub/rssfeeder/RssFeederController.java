@@ -118,11 +118,17 @@ public class RssFeederController {
             entry.setTitle(nrequests.getShelfmark());
             entry.setUpdatedDate(new Date());
             SyndContent content = new SyndContentImpl();
-            content.setValue("<h2>" + nrequests.getShelfmark() + ":</h2>" +
-                    nrequests.getMab() + " <br /> " +
-                    "<table><tr><td>Verhältnis:</td><td>" + String.format("%.2f", nrequests.getRatio()) + "</td></tr><tr><td>Anzahl Vormerkungen: </td><td>" + nrequests.getNRequests() +
-                    " </td></tr><tr><td>Dauer: </td><td>" + nrequests.geTotalDuration() +
-                    " </td></tr><table><br /><a href=\"/protokoll?shelfmark=" + nrequests.getShelfmark() + "&exact=\">Zum Ausleihprotokoll</a>");
+            String contentString = "<h2>" + nrequests.getShelfmark() + ":</h2>";
+            contentString += nrequests.getMab() + "<br /> ";
+            contentString += "<table>";
+            contentString += "<tr><td>Anzahl Vormerkungen:</td><td>" + nrequests.getNRequests() + "</td></tr>";
+            contentString += "<tr><td>Ausleihbare Exemplare:</td><td>" + nrequests.getNLendable() + "</td></tr>";
+            contentString += "<tr><td>Verhältnis:</td><td>" + String.format("%.2f", nrequests.getRatio()) + "</td></tr>";
+            contentString += "<tr><td>Dauer:</td><td>" + nrequests.geTotalDuration() + "</td></tr>";
+            contentString += "</table> \n <br />";
+            contentString += "<a href=\"https://lib-intel.ub.uni-due.de/protokoll?shelfmark=" + nrequests.getShelfmark() + "&exact=\">Zum Ausleihprotokoll</a>";
+
+            content.setValue(contentString);
             entry.setContents(Collections.singletonList(content));
             entries.add(entry);
         }
