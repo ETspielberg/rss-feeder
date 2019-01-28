@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import unidue.ub.rssfeeder.model.Alertcontrol;
 import unidue.ub.rssfeeder.model.Nrequests;
 
+import java.util.List;
+
 
 @FeignClient(name="stock-analyzer", configuration = FeignConfiguration.class)
 @Component
@@ -20,7 +22,7 @@ public interface StockanalyzerClient {
     Resource<Alertcontrol> getAlertcontrol(@PathVariable("identifier") String identifier);
 
     @RequestMapping(method = RequestMethod.GET, value="/nrequests/getForTimeperiod")
-    Resources<Nrequests> getNrequestsForTimeperiod(@RequestParam("startNotation") String startNotation, @RequestParam("endNotation") String endNotation, @RequestParam("timeperiod") Long timeperiod);
+    List<Nrequests> getNrequestsForTimeperiod(@RequestParam("startNotation") String startNotation, @RequestParam("endNotation") String endNotation, @RequestParam("timeperiod") Long timeperiod);
 
     @RequestMapping(method = RequestMethod.POST, value="/nrequests")
     Nrequests saveNrequests(Nrequests nrequests);
