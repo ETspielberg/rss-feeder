@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 
 
 @FeignClient(name="blacklist-backend", configuration = FeignConfiguration.class)
@@ -12,6 +13,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 public interface BlacklistClient {
 
     @RequestMapping(method= RequestMethod.GET, value="/getIgnoredFor/{identifier}")
-    Boolean isBlocked(@PathVariable("identifier") String identifier, String type);
+    Boolean isBlocked(@PathVariable("identifier") String identifier, @RequestParam("type") String type);
 
 }
