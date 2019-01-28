@@ -1,52 +1,48 @@
 package unidue.ub.rssfeeder;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rometools.rome.feed.synd.*;
 import com.rometools.rome.io.FeedException;
 import com.rometools.rome.io.SyndFeedOutput;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.RequestEntity;
-import org.apache.commons.httpclient.methods.StringRequestEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
-import unidue.ub.media.blacklist.Ignored;
-import unidue.ub.media.analysis.Nrequests;
-import unidue.ub.settings.fachref.Alertcontrol;
-import unidue.ub.settings.fachref.Notationgroup;
+import unidue.ub.rssfeeder.clients.BlacklistClient;
+import unidue.ub.rssfeeder.clients.SettingsClient;
+import unidue.ub.rssfeeder.clients.StockanalyzerClient;
+import unidue.ub.rssfeeder.model.Alertcontrol;
+import unidue.ub.rssfeeder.model.Notationgroup;
+import unidue.ub.rssfeeder.model.Nrequests;
 
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.net.URISyntaxException;
 import java.util.*;
 
-@RestController
+@Controller
 public class RssFeederController {
 
-    //@Value("${ub.statistics.settings.url}")
-    private String settingsUrl = "http://localhost:11300";
+    private final BlacklistClient blacklistClient;
 
-    //@Value("${ub.statistics.data.url}")
-    private String dataUrl = "http://localhost:11200";
+    private final SettingsClient settingsClient;
+
+    private final StockanalyzerClient stockanalyzerClient;
 
     private Hashtable<String, Nrequests> foundNrequests;
 
     private Logger log = LoggerFactory.getLogger(this.getClass());
-    private ObjectMapper mapper = new ObjectMapper();
-    private static final HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
+
+    @Autowired
+    public RssFeederController(BlacklistClient blacklistClient, SettingsClient settingsClient, StockanalyzerClient stockanalyzerClient) {
+        this.blacklistClient = blacklistClient;
+        this.settingsClient = settingsClient;
+        this.stockanalyzerClient = stockanalyzerClient;
+    }
+
 
     @ResponseBody
     @RequestMapping("/")
-    public String getNrequestsFeed(@RequestParam("alertcontrol") String identifier, @RequestParam("requestor") Optional<String> requestor) throws FeedException, URISyntaxException, UnsupportedEncodingException {
+    public String getNrequestsFeed(@RequestParam("alertcontrol") String identifier, @RequestParam("requestor") Optional<String> requestor) throws FeedException {
         foundNrequests = new Hashtable<>();
 
         SyndFeed feed = new SyndFeedImpl();
@@ -54,60 +50,39 @@ public class RssFeederController {
         feed.setTitle("Hitlisten-Feed");
         feed.setDescription("Titel, die die eingestellten Schwellenwerte überschreiten.");
 
-        ResponseEntity<Alertcontrol> responseAlertcontrol = new RestTemplate().getForEntity(
-                settingsUrl + "/alertcontrol/" + identifier,
-                Alertcontrol.class
-        );
-        Alertcontrol alertcontrol = responseAlertcontrol.getBody();
-
-        ResponseEntity<Notationgroup> responseNotationgroup = new RestTemplate().getForEntity(
-                settingsUrl + "/notationgroup/" + alertcontrol.getNotationgroup(),
-                Notationgroup.class
-        );
-        Notationgroup notationgroup = responseNotationgroup.getBody();
-
-        String url = dataUrl + "/nrequests/getForTimeperiod"
-                + "?startNotation=" + notationgroup.getNotationsStart() + "&endNotation=" + notationgroup.getNotationsEnd()
-                + "&timeperiod=" + alertcontrol.getTimeperiod();
-
-        Nrequests[] nrequestss = new RestTemplate().getForEntity(url, Nrequests[].class).getBody();
+        Alertcontrol alertcontrol = stockanalyzerClient.getAlertcontrol(identifier).getContent();
+        Notationgroup notationgroup = settingsClient.getNotationgroup(alertcontrol.getNotationgroup()).getContent();
+        Collection<Nrequests> nrequestss = stockanalyzerClient.getNrequestsForTimeperiod(notationgroup.getNotationsStart(), notationgroup.getNotationsEnd(), alertcontrol.getTimeperiod()).getContent();
 
         for (Nrequests nrequests : nrequestss) {
-            try {
-                ResponseEntity<Ignored> response = new RestTemplate().getForEntity(
-                        "http://localhost:8082/api/blacklist/ignored/" + nrequests.getTitleId(),
-                        Ignored.class,
-                        0);
-                Ignored ignored = response.getBody();
-                if (ignored.getExpire().after(new Date()) && ignored.getType().equals("eventanalysis")) {
-                    log.info("manifestion " + nrequests.getTitleId() + " is blacklisted");
+            boolean isBlocked = blacklistClient.isBlocked(nrequests.getIdentifier(), "nrequests");
+            if (isBlocked) {
+                log.info("manifestion " + nrequests.getTitleId() + " is blacklisted");
+                continue;
+            }
+            if (requestor.isPresent()) {
+                log.info("checking for requestor " + requestor.get());
+                if (nrequests.getStatus() == null || nrequests.getStatus().equals("") || nrequests.getStatus().equals("NEW")) {
+                    nrequests.setStatus(requestor.get());
+                    log.info("set status to requestor");
+                } else if (nrequests.getStatus().contains(requestor.get())) {
+                    log.info("nrequests already collected by requestor");
                     continue;
+                } else {
+                    nrequests.setStatus(nrequests.getStatus() + " " + requestor.get());
+                    log.info("adding requestor " + requestor.get() + " to list of requestors: " + nrequests.getStatus());
                 }
-            } catch (HttpClientErrorException httpClientErrorException) {
-                if (requestor.isPresent()) {
-                    log.info("checking for requestor " + requestor.get());
-                    if (nrequests.status == null || nrequests.status.equals("") || nrequests.status.equals("NEW")) {
-                        nrequests.setStatus(requestor.get());
-                        log.info("set status to requestor");
-                    } else if (nrequests.status.contains(requestor.get())) {
-                        log.info("nrequests already collected by requestor");
-                        continue;
-                    } else {
-                        nrequests.status = nrequests.status + " " + requestor.get();
-                        log.info("adding requestor " + requestor.get() + " to list of requestors: " + nrequests.status);
-                    }
-                }
+            }
 
-                boolean isTotalDurationThresholdExceeded = nrequests.geTotalDuration() > alertcontrol.getThresholdDuration();
-                boolean isRatioThresholdExceeded = nrequests.getRatio() > alertcontrol.getThresholdRatio();
-                boolean isNRequestsThresholdExceeded = nrequests.getNRequests() > alertcontrol.getThresholdRequests();
-                if (isTotalDurationThresholdExceeded || isRatioThresholdExceeded || isNRequestsThresholdExceeded) {
-                    if (foundNrequests.containsKey(nrequests.getTitleId())) {
-                        if (foundNrequests.get(nrequests.getTitleId()).getNRequests() < nrequests.getNRequests())
-                            foundNrequests.replace(nrequests.getTitleId(), nrequests);
-                    } else {
-                        foundNrequests.put(nrequests.getTitleId(),nrequests);
-                    }
+            boolean isTotalDurationThresholdExceeded = nrequests.geTotalDuration() > alertcontrol.getThresholdDuration();
+            boolean isRatioThresholdExceeded = nrequests.getRatio() > alertcontrol.getThresholdRatio();
+            boolean isNRequestsThresholdExceeded = nrequests.getNRequests() > alertcontrol.getThresholdRequests();
+            if (isTotalDurationThresholdExceeded || isRatioThresholdExceeded || isNRequestsThresholdExceeded) {
+                if (foundNrequests.containsKey(nrequests.getTitleId())) {
+                    if (foundNrequests.get(nrequests.getTitleId()).getNRequests() < nrequests.getNRequests())
+                        foundNrequests.replace(nrequests.getTitleId(), nrequests);
+                } else {
+                    foundNrequests.put(nrequests.getTitleId(), nrequests);
                 }
             }
         }
@@ -140,24 +115,13 @@ public class RssFeederController {
         return entries;
     }
 
-    private void updateNrequests(Nrequests[] nrequestss) {
+    private void updateNrequests(Collection<Nrequests> nrequestss) {
         int succesfullPosts = 0;
         for (Nrequests nrequest : nrequestss) {
-            try {
-                String json = mapper.writeValueAsString(nrequest);
-                HttpClient client = new HttpClient(httpConnectionManager);
-                PostMethod post = new PostMethod("http://localhost:8082/api/data/nrequests");
-                RequestEntity entity = new StringRequestEntity(json, "application/json", null);
-                post.setRequestEntity(entity);
-                int status = client.executeMethod(post);
-                if (status == 201)
-                    succesfullPosts++;
-                post.releaseConnection();
-            } catch (IOException ioEx) {
-                log.warn("could not update nrequests for " + nrequest.getTitleId());
-            }
+            stockanalyzerClient.saveNrequests(nrequest);
+            succesfullPosts++;
         }
-        log.info("successfully posted " + succesfullPosts + " of " + nrequestss.length + " nrequests.");
+        log.info("successfully posted " + succesfullPosts);
     }
 
 }
