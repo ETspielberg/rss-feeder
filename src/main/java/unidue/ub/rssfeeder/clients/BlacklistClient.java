@@ -12,6 +12,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 public interface BlacklistClient {
 
     @RequestMapping(method= RequestMethod.GET, value="/getIgnoredFor/{identifier}")
-    Boolean isBlocked(@PathVariable String identifier, String type);
+    Boolean isBlocked(@PathVariable("identifier") String identifier, String type);
 
 }

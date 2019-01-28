@@ -17,7 +17,7 @@ import unidue.ub.rssfeeder.model.Nrequests;
 public interface StockanalyzerClient {
 
     @RequestMapping(method= RequestMethod.GET, value="/alertcontrol/{identifier}")
-    Resource<Alertcontrol> getAlertcontrol(@PathVariable String identifier);
+    Resource<Alertcontrol> getAlertcontrol(@PathVariable("identifier") String identifier);
 
     @RequestMapping(method = RequestMethod.GET, value="/nrequests/getForTimeperiod")
     Resources<Nrequests> getNrequestsForTimeperiod(@RequestParam("startNotation") String startNotation, @RequestParam("endNotation") String endNotation, @RequestParam("timeperiod") Long timeperiod);

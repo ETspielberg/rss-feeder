@@ -13,6 +13,6 @@ import unidue.ub.rssfeeder.model.Notationgroup;
 public interface SettingsClient {
 
     @RequestMapping(method= RequestMethod.GET, value="/notationgroup/{identifier")
-    Resource<Notationgroup> getNotationgroup(@PathVariable String identifier);
+    Resource<Notationgroup> getNotationgroup(@PathVariable("identifier") String identifier);
 
 }
