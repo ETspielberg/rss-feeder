@@ -12,7 +12,7 @@ import unidue.ub.rssfeeder.model.Notationgroup;
 @Component
 public interface SettingsClient {
 
-    @RequestMapping(method= RequestMethod.GET, value="/notationgroup/{identifier")
+    @RequestMapping(method= RequestMethod.GET, value="/notationgroup/{identifier}")
     Resource<Notationgroup> getNotationgroup(@PathVariable("identifier") String identifier);
 
 }
