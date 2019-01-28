@@ -55,10 +55,14 @@ public class RssFeederController {
         List<Nrequests> nrequestss = stockanalyzerClient.getNrequestsForTimeperiod(notationgroup.getNotationsStart(), notationgroup.getNotationsEnd(), alertcontrol.getTimeperiod());
 
         for (Nrequests nrequests : nrequestss) {
-            boolean isBlocked = blacklistClient.isBlocked(nrequests.getIdentifier(), "nrequests");
-            if (isBlocked) {
-                log.info("manifestion " + nrequests.getTitleId() + " is blacklisted");
-                continue;
+            try {
+                boolean isBlocked = blacklistClient.isBlocked(nrequests.getIdentifier(), "nrequests");
+                if (isBlocked) {
+                    log.info("manifestion " + nrequests.getTitleId() + " is blacklisted");
+                    continue;
+                }
+            } catch (Exception e) {
+                log.info("no useful blacklist response");
             }
             if (requestor.isPresent()) {
                 log.info("checking for requestor " + requestor.get());
