@@ -52,7 +52,7 @@ public class RssFeederController {
 
         Alertcontrol alertcontrol = stockanalyzerClient.getAlertcontrol(identifier).getContent();
         Notationgroup notationgroup = settingsClient.getNotationgroup(alertcontrol.getNotationgroup()).getContent();
-        Collection<Nrequests> nrequestss = stockanalyzerClient.getNrequestsForTimeperiod(notationgroup.getNotationsStart(), notationgroup.getNotationsEnd(), alertcontrol.getTimeperiod()).getContent();
+        List<Nrequests> nrequestss = stockanalyzerClient.getNrequestsForTimeperiod(notationgroup.getNotationsStart(), notationgroup.getNotationsEnd(), alertcontrol.getTimeperiod());
 
         for (Nrequests nrequests : nrequestss) {
             boolean isBlocked = blacklistClient.isBlocked(nrequests.getIdentifier(), "nrequests");
