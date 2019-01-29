@@ -15,7 +15,7 @@ import java.util.List;
 @Component
 public interface StockanalyzerClient {
 
-    @RequestMapping(method = RequestMethod.GET, value="/nrequests/forAlertcontrol/{alertcontrol}")
+    @RequestMapping(method = RequestMethod.GET, value="/nrequests/forAlertcontrol/{identifier}")
     List<Nrequests> getForAlertcontrol(@PathVariable("identifier") String identifier, @RequestParam("requestor") String requestor);
 
 
