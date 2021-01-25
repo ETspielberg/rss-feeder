@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: rssfeeder
+  cloud:
+    config:
+      uri: http://localhost:11811
+      name: service-provider
+      username: ${libintel.config.username:dalek}
+      password: ${libintel.config.password:3l1m1nat3}
+
+
+libintel:
+  user:
+    name: ${libintel_system_username:thedoctor}
+    password: ${libintel_system_password:Tard15}
